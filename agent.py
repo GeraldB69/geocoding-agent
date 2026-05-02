@@ -2,7 +2,7 @@ import requests
 import re
 import json
 
-ollama_model = "llama3.1:8b"
+ollama_model = "gemma3:1b"
 
 # ------------------------------------------------------------
 # Fallback heuristic rules (used when Ollama is unavailable)

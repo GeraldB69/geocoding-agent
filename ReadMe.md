@@ -29,7 +29,7 @@ cd geocoding-agent
 4. [Optional] Install and start Ollama
 
 ```bash
-ollama pull llama3.1:8b
+ollama pull gemma3:1b
 ollama serve   # if needed
 ```
 
