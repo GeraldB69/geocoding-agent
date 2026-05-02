@@ -1,41 +1,37 @@
 import requests
 
-# Adresse de test (matérielle, comme demandé)
-ADRESSE = "1 rue de la Paix, Paris"
+TEST_ADDRESS = "1 rue de la Paix, Paris"
 
-def geocoder(adresse):
-    """Interroge l'API Nominatim et retourne le premier résultat."""
+def geocode(address):
     url = "https://nominatim.openstreetmap.org/search"
     params = {
-        "q": adresse,
+        "q": address,
         "format": "json",
         "limit": 1,
         "addressdetails": 1,
     }
-    headers = {
-        "User-Agent": "MonAgentRechercheAdresse/1.0"
-    }
+    headers = {"User-Agent": "AddressSearchAgent/1.0"}
 
     try:
-        reponse = requests.get(url, params=params, headers=headers, timeout=10)
-        reponse.raise_for_status()
-        donnees = reponse.json()
-        return donnees[0] if donnees else None
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data[0] if data else None
     except requests.exceptions.RequestException as e:
-        print(f"Erreur lors de l'appel à l'API : {e}")
+        print(f"API error: {e}")
         return None
 
 def main():
-    print(f"Recherche de : {ADRESSE}")
-    resultat = geocoder(ADRESSE)
+    print(f"Searching for: {TEST_ADDRESS}")
+    result = geocode(TEST_ADDRESS)
 
-    if resultat:
-        print("Adresse trouvée :")
-        print(f"  Affichage complet : {resultat.get('display_name')}")
-        print(f"  Latitude  : {resultat['lat']}")
-        print(f"  Longitude : {resultat['lon']}")
+    if result:
+        print("Address found:")
+        print(f"  Display name: {result.get('display_name')}")
+        print(f"  Latitude: {result['lat']}")
+        print(f"  Longitude: {result['lon']}")
     else:
-        print("Aucun résultat.")
+        print("No result found.")
 
 if __name__ == "__main__":
     main()
