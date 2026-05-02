@@ -1,7 +1,5 @@
 import requests
 
-TEST_ADDRESS = "1 rue de la Paix, Paris"
-
 def geocode(address):
     url = "https://nominatim.openstreetmap.org/search"
     params = {
@@ -22,16 +20,21 @@ def geocode(address):
         return None
 
 def main():
-    print(f"Searching for: {TEST_ADDRESS}")
-    result = geocode(TEST_ADDRESS)
+    print("Address search agent. Type 'quit' or 'q' to exit.")
+    while True:
+        user_input = input("\nEnter address: ").strip()
+        if user_input.lower() in ("quit", "q"):
+            print("Goodbye.")
+            break
+        if not user_input:
+            continue
 
-    if result:
-        print("Address found:")
-        print(f"  Display name: {result.get('display_name')}")
-        print(f"  Latitude: {result['lat']}")
-        print(f"  Longitude: {result['lon']}")
-    else:
-        print("No result found.")
+        result = geocode(user_input)
+        if result:
+            print(f"Display name: {result.get('display_name')}")
+            print(f"Latitude: {result['lat']}, Longitude: {result['lon']}")
+        else:
+            print("No result found.")
 
 if __name__ == "__main__":
     main()
