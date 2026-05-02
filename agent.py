@@ -2,6 +2,8 @@ import requests
 import re
 import json
 
+ollama_model = "llama3.1:8b"
+
 # ------------------------------------------------------------
 # Fallback heuristic rules (used when Ollama is unavailable)
 # ------------------------------------------------------------
@@ -46,7 +48,7 @@ def analyze_with_llm(text):
         response = requests.post(
             "http://localhost:11434/api/chat",
             json={
-                "model": "llama3.1:8b",
+                "model": ollama_model,
                 "messages": [
                     {
                         "role": "system",
@@ -134,9 +136,9 @@ def parse_coordinates(text):
 def _print_startup_banner(ollama_available):
     print("Address search & reverse geocoding agent with local LLM (Ollama).\n")
     if ollama_available:
-        print("✅ Ollama is running. Enhanced address analysis enabled.\n")
+        print("Ollama is running. Enhanced address analysis enabled.\n")
     else:
-        print("⚠️ Ollama not available. Using fallback heuristics.\n")
+        print("Ollama not available. Using fallback heuristics.\n")
 
 
 def _process_coordinate_input(user_input):
