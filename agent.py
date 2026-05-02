@@ -3,6 +3,30 @@ import re
 import json
 
 ollama_model = "gemma3:1b"
+llm_system_prompt = (
+    "You are an address precision classifier. Your only task is to examine the user's address input "
+    "and output a JSON object with exactly the fields: language, precise, message.\n\n"
+    "No extra text, no markdown, no explanations.\n\n"
+    "You MUST follow these step-by-step rules:\n"
+    "  1. Detect the language of the input. Use ISO 639-1 code (e.g., 'fr', 'en'). Place it in the 'language' field.\n"
+    "  2. IF the input address contains BOTH a city name AND a postal code WITHOUT a street name : set precise = false.\n"
+    "  3. IF the input address contains BOTH a street name AND a city name WITHOUT a postal code : set precise = false.\n"
+    "  4. IF the input address contains BOTH a street name AND a postal code WITHOUT a city name : set precise = false.\n"
+    "  5. IF the input address contains ONLY a city name : set precise = false.\n"
+    "  6. IF the input address contains ONLY a city name WITHOUT a street or a postal code : set precise = false.\n"
+    "  7. IF the input address contains ONLY a postal code : set precise = false.\n"
+    "  8. IF the input address contains ONLY a postal code WITHOUT a street name OR a city name : set precise = false.\n"
+    "  9. IF the input address contains ONLY a street name : set precise = false.\n"
+    " 10. IF the input address contains ONLY a street name (with or without a number) WITHOUT a city OR a postal code : set precise = false.\n"
+    " 11. IF the input address contains ONLY a street number WITHOUT a city name OR a postal code : set precise = false.\n"
+    " 12. IF the input address contains BOTH a street name AND a city name AND a postal code : set precise = true.\n"
+    " 13. IF the input address contains ONLY a city name AND a postal code : set precise = true.\n"
+    " 14. IF the input address contains ONLY a street name AND a city name : set precise = true.\n"
+    " 15. IF the input address contains ONLY a street name AND a city name AND a postal code : set precise = true.\n"
+    " 16. IF the input address contains ONLY a street name AND a city name OR a postal code : set precise = true.\n"
+    " 17. IF the input address contains ONLY a street name AND a postal code : set precise = true.\n"
+    " At the end of the analysis, ONLY if precise is FALSE, set message to a brief, polite sentence in the detected language asking for the missing information."
+)
 
 # ------------------------------------------------------------
 # Fallback heuristic rules (used when Ollama is unavailable)
@@ -53,13 +77,7 @@ def analyze_with_llm(text):
                     {
                         "role": "system",
                         "content": (
-                            "You are an address analysis assistant. Given a user input, determine: "
-                            "1. The language of the input (e.g., 'fr', 'en', 'es', 'de'). "
-                            "2. Whether the address is precise enough for geocoding. A precise address must include a street (with or without number) AND either a city or a postal code. "
-                            "If precise is false, provide a polite message in the detected language asking for the missing information (e.g., 'Please provide a city or postal code.'). "
-                            "Respond ONLY with a valid JSON object containing exactly: "
-                            "{\"language\": \"xx\", \"precise\": true/false, \"message\": \"...\"}. "
-                            "No extra text."
+                            llm_system_prompt
                         )
                     },
                     {"role": "user", "content": text}
@@ -71,6 +89,7 @@ def analyze_with_llm(text):
         )
         data = response.json()
         content = data["message"]["content"].strip()
+        print(content)
         # Extract JSON object (sometimes LLM wraps in backticks)
         start = content.find("{")
         end = content.rfind("}") + 1
@@ -165,6 +184,7 @@ def _process_llm_address_input(user_input):
         print("(LLM call failed, falling back to heuristics)")
         return False
     if llm_result.get("precise", False):
+        # The LLM confirmed the address is complete → geocode
         print(f"Language: {llm_result.get('language', 'unknown')}")
         result = geocode(user_input)
         if result:
@@ -173,6 +193,7 @@ def _process_llm_address_input(user_input):
         else:
             print("Address not found in Nominatim.")
     else:
+        # Address incomplete → show the LLM's polite message
         print(llm_result.get("message", "Insufficient address details."))
     return True
 
