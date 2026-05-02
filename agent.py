@@ -131,73 +131,86 @@ def parse_coordinates(text):
 # ------------------------------------------------------------
 # Main interactive loop
 # ------------------------------------------------------------
-def main():
+def _print_startup_banner(ollama_available):
     print("Address search & reverse geocoding agent with local LLM (Ollama).\n")
-
-    # Startup check for Ollama
-    ollama_available = is_ollama_available()
     if ollama_available:
         print("✅ Ollama is running. Enhanced address analysis enabled.\n")
     else:
         print("⚠️ Ollama not available. Using fallback heuristics.\n")
 
-    while True:
-        user_input = input("Input: ").strip()
-        if user_input.lower() in ("quit", "q"):
-            print("Goodbye.")
-            break
-        if not user_input:
-            continue
 
-        # Coordinates branch (bypass LLM)
-        if is_coordinates(user_input):
-            lat, lon = parse_coordinates(user_input)
-            if lat is None:
-                print("Invalid coordinate format.")
-                continue
-            print(f"Reverse geocoding for {lat}, {lon}...")
-            result = reverse_geocode(lat, lon)
-            if result:
-                print(f"Address: {result.get('display_name')}")
-            else:
-                print("No address found.")
-            continue
+def _process_coordinate_input(user_input):
+    """Reverse-geocode if input looks like coordinates. Returns True if handled."""
+    if not is_coordinates(user_input):
+        return False
+    lat, lon = parse_coordinates(user_input)
+    if lat is None:
+        print("Invalid coordinate format.")
+        return True
+    print(f"Reverse geocoding for {lat}, {lon}...")
+    result = reverse_geocode(lat, lon)
+    if result:
+        print(f"Address: {result.get('display_name')}")
+    else:
+        print("No address found.")
+    return True
 
-        # LLM analysis (address mode) – but only if Ollama is available
-        if ollama_available:
-            llm_result = analyze_with_llm(user_input)
-            if llm_result is not None:
-                if llm_result.get("precise", False):
-                    print(f"Language: {llm_result.get('language', 'unknown')}")
-                    result = geocode(user_input)
-                    if result:
-                        print(f"Display name: {result.get('display_name')}")
-                        print(f"Latitude: {result['lat']}, Longitude: {result['lon']}")
-                    else:
-                        print("Address not found in Nominatim.")
-                else:
-                    print(llm_result.get("message", "Insufficient address details."))
-                continue
-            # If llm_result is None (Ollama call failed, e.g., timeout), 
-            # fall through to heuristic fallback
-            print("(LLM call failed, falling back to heuristics)")
 
-        # Fallback heuristics (Ollama unavailable or call failed)
-        if is_street_only(user_input):
-            print("Insufficient: street name without city or postal code.")
-            print("Please add a city or postal code (e.g., '12 rue de Rivoli, Paris').")
-            continue
-        if not has_locality_hint(user_input):
-            print("Insufficient: please include a city or postal code.")
-            print("Example: '56 rue des fleurs, Calais' or '56 rue des fleurs 62100'.")
-            continue
-
+def _process_llm_address_input(user_input):
+    """LLM path when Ollama works. Returns True if loop should continue."""
+    llm_result = analyze_with_llm(user_input)
+    if llm_result is None:
+        print("(LLM call failed, falling back to heuristics)")
+        return False
+    if llm_result.get("precise", False):
+        print(f"Language: {llm_result.get('language', 'unknown')}")
         result = geocode(user_input)
         if result:
             print(f"Display name: {result.get('display_name')}")
             print(f"Latitude: {result['lat']}, Longitude: {result['lon']}")
         else:
-            print("No result found.")
+            print("Address not found in Nominatim.")
+    else:
+        print(llm_result.get("message", "Insufficient address details."))
+    return True
+
+
+def _process_heuristic_geocode(user_input):
+    if is_street_only(user_input):
+        print("Insufficient: street name without city or postal code.")
+        print("Please add a city or postal code (e.g., '12 rue de Rivoli, Paris').")
+        return True
+    if not has_locality_hint(user_input):
+        print("Insufficient: please include a city or postal code.")
+        print("Example: '56 rue des fleurs, Calais' or '56 rue des fleurs 62100'.")
+        return True
+    result = geocode(user_input)
+    if result:
+        print(f"Display name: {result.get('display_name')}")
+        print(f"Latitude: {result['lat']}, Longitude: {result['lon']}")
+    else:
+        print("No result found.")
+    return False
+
+
+def main():
+    ollama_available = is_ollama_available()
+    _print_startup_banner(ollama_available)
+
+    while True:
+        user_input = input("Input: ").strip()
+        lowered = user_input.lower()
+        if lowered in ("quit", "q"):
+            print("Goodbye.")
+            break
+        if not user_input:
+            continue
+        if _process_coordinate_input(user_input):
+            continue
+        if ollama_available and _process_llm_address_input(user_input):
+            continue
+        if _process_heuristic_geocode(user_input):
+            continue
 
 if __name__ == "__main__":
     main()
