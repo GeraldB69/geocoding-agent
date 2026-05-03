@@ -2,30 +2,17 @@ import requests
 import re
 import json
 
-ollama_model = "gemma3:1b"
+# ollama_model = "granite4:350m"
+ollama_model = "qwen3:0.6b"
 llm_system_prompt = (
-    "You are an address precision classifier. Your only task is to examine the user's address input "
-    "and output a JSON object with exactly the fields: language, precise, message.\n\n"
-    "No extra text, no markdown, no explanations.\n\n"
-    "You MUST follow these step-by-step rules:\n"
-    "  1. Detect the language of the input. Use ISO 639-1 code (e.g., 'fr', 'en'). Place it in the 'language' field.\n"
-    "  2. IF the input address contains BOTH a city name AND a postal code WITHOUT a street name : set precise = false.\n"
-    "  3. IF the input address contains BOTH a street name AND a city name WITHOUT a postal code : set precise = false.\n"
-    "  4. IF the input address contains BOTH a street name AND a postal code WITHOUT a city name : set precise = false.\n"
-    "  5. IF the input address contains ONLY a city name : set precise = false.\n"
-    "  6. IF the input address contains ONLY a city name WITHOUT a street or a postal code : set precise = false.\n"
-    "  7. IF the input address contains ONLY a postal code : set precise = false.\n"
-    "  8. IF the input address contains ONLY a postal code WITHOUT a street name OR a city name : set precise = false.\n"
-    "  9. IF the input address contains ONLY a street name : set precise = false.\n"
-    " 10. IF the input address contains ONLY a street name (with or without a number) WITHOUT a city OR a postal code : set precise = false.\n"
-    " 11. IF the input address contains ONLY a street number WITHOUT a city name OR a postal code : set precise = false.\n"
-    " 12. IF the input address contains BOTH a street name AND a city name AND a postal code : set precise = true.\n"
-    " 13. IF the input address contains ONLY a city name AND a postal code : set precise = true.\n"
-    " 14. IF the input address contains ONLY a street name AND a city name : set precise = true.\n"
-    " 15. IF the input address contains ONLY a street name AND a city name AND a postal code : set precise = true.\n"
-    " 16. IF the input address contains ONLY a street name AND a city name OR a postal code : set precise = true.\n"
-    " 17. IF the input address contains ONLY a street name AND a postal code : set precise = true.\n"
-    " At the end of the analysis, ONLY if precise is FALSE, set message to a brief, polite sentence in the detected language asking for the missing information."
+    "You are an address parser. Extract the following from the user input, "
+    "returning ONLY a strict JSON object with these fields: "
+    "{\"language\":\"xx\",\"street\":null,\"city\":null,\"postal_code\":null}. "
+    "language: detect user input language and return ISO 639-1 code. "
+    "street: any recognized thoroughfare (rue, avenue, street, road, etc.) including an optional number, or null. "
+    "city: any recognized populated place name, or null. "
+    "postal_code: any recognized postal/ZIP code, or null. "
+    "No extra text, no markdown."
 )
 
 # ------------------------------------------------------------
@@ -37,6 +24,8 @@ STREET_PATTERN = re.compile(
 )
 
 def is_street_only(query):
+    """Checks if query contains only a street name. Returns True if present."""
+    
     query = query.strip()
     if "," in query:
         return False
@@ -45,6 +34,8 @@ def is_street_only(query):
     return bool(STREET_PATTERN.match(query))
 
 def has_locality_hint(query):
+    """Checks if query contains a locality hint. Returns True if present."""
+    
     query = query.strip()
     if "," in query:
         return True
@@ -56,6 +47,8 @@ def has_locality_hint(query):
 # Ollama availability check
 # ------------------------------------------------------------
 def is_ollama_available():
+    """Checks if Ollama is available. Returns True if reachable."""
+    
     try:
         response = requests.get("http://localhost:11434/api/tags", timeout=5)
         return response.status_code == 200
@@ -68,6 +61,7 @@ def is_ollama_available():
 def analyze_with_llm(text):
     """Returns a dict with keys: language, precise, message (if not precise).
     Returns None if Ollama is not reachable."""
+    
     try:
         response = requests.post(
             "http://localhost:11434/api/chat",
@@ -89,7 +83,6 @@ def analyze_with_llm(text):
         )
         data = response.json()
         content = data["message"]["content"].strip()
-        print(content)
         # Extract JSON object (sometimes LLM wraps in backticks)
         start = content.find("{")
         end = content.rfind("}") + 1
@@ -103,6 +96,8 @@ def analyze_with_llm(text):
 # Geocoding API calls
 # ------------------------------------------------------------
 def geocode(address):
+    """Geocodes address. Returns address data or None."""
+    
     url = "https://nominatim.openstreetmap.org/search"
     params = {
         "q": address,
@@ -121,6 +116,8 @@ def geocode(address):
         return None
 
 def reverse_geocode(lat, lon):
+    """Reverse-geocodes coordinates. Returns address data or None."""
+    
     url = "https://nominatim.openstreetmap.org/reverse"
     params = {
         "lat": lat,
@@ -139,10 +136,14 @@ def reverse_geocode(lat, lon):
         return None
 
 def is_coordinates(text):
+    """Checks if text looks like coordinates. Returns True if valid."""
+    
     pattern = re.compile(r"^\s*([-+]?\d+\.?\d*)\s*[,;\s]\s*([-+]?\d+\.?\d*)\s*$")
     return pattern.match(text) is not None
 
 def parse_coordinates(text):
+    """Parses coordinates from text. Returns (lat, lon) tuple or None."""
+
     pattern = re.compile(r"^\s*([-+]?\d+\.?\d*)\s*[,;\s]\s*([-+]?\d+\.?\d*)\s*$")
     match = pattern.match(text)
     if match:
@@ -153,6 +154,8 @@ def parse_coordinates(text):
 # Main interactive loop
 # ------------------------------------------------------------
 def _print_startup_banner(ollama_available):
+    """Prints the startup banner."""
+
     print("Address search & reverse geocoding agent with local LLM (Ollama).\n")
     if ollama_available:
         print("Ollama is running. Enhanced address analysis enabled.\n")
@@ -162,6 +165,7 @@ def _print_startup_banner(ollama_available):
 
 def _process_coordinate_input(user_input):
     """Reverse-geocode if input looks like coordinates. Returns True if handled."""
+
     if not is_coordinates(user_input):
         return False
     lat, lon = parse_coordinates(user_input)
@@ -177,28 +181,57 @@ def _process_coordinate_input(user_input):
     return True
 
 
+def _missing_llm_address_labels(has_street, has_city, has_postal):
+    """Human-readable missing parts when LLM output is not geocodable."""
+
+    if not has_street and not has_city and not has_postal:
+        return ["complete address"]
+    has_locality = has_city or has_postal
+    missing = []
+    if not has_street:
+        missing.append("street")
+    if not has_locality:
+        missing.append("city or postal code")
+    return missing
+
+
+def _print_nominatim_geocode_for_input(user_input):
+    """Geocode user_input via Nominatim and print result or not-found."""
+
+    result = geocode(user_input)
+    if result:
+        print(f"Display name: {result.get('display_name')}")
+        print(f"Latitude: {result['lat']}, Longitude: {result['lon']}")
+    else:
+        print("Address not found in Nominatim.")
+
+
 def _process_llm_address_input(user_input):
     """LLM path when Ollama works. Returns True if loop should continue."""
+
     llm_result = analyze_with_llm(user_input)
-    if llm_result is None:
+    if not llm_result:
         print("(LLM call failed, falling back to heuristics)")
         return False
-    if llm_result.get("precise", False):
-        # The LLM confirmed the address is complete → geocode
-        print(f"Language: {llm_result.get('language', 'unknown')}")
-        result = geocode(user_input)
-        if result:
-            print(f"Display name: {result.get('display_name')}")
-            print(f"Latitude: {result['lat']}, Longitude: {result['lon']}")
-        else:
-            print("Address not found in Nominatim.")
-    else:
-        # Address incomplete → show the LLM's polite message
-        print(llm_result.get("message", "Insufficient address details."))
+
+    has_street = llm_result.get("street") is not None
+    has_city = llm_result.get("city") is not None
+    has_postal = llm_result.get("postal_code") is not None
+    has_locality = has_city or has_postal
+
+    if not (has_street and has_locality):
+        missing = _missing_llm_address_labels(has_street, has_city, has_postal)
+        print(f"Insufficient address. Missing: {', '.join(missing)}.")
+        return True
+
+    print(f"Language: {llm_result.get('language', 'unknown')}")
+    _print_nominatim_geocode_for_input(user_input)
     return True
 
 
 def _process_heuristic_geocode(user_input):
+    """Fallback path when LLM is not available. Returns True if loop should continue."""
+
     if is_street_only(user_input):
         print("Insufficient: street name without city or postal code.")
         print("Please add a city or postal code (e.g., '12 rue de Rivoli, Paris').")
@@ -217,6 +250,8 @@ def _process_heuristic_geocode(user_input):
 
 
 def main():
+    """Main loop: handles user input, LLM calls, and fallback logic."""
+
     ollama_available = is_ollama_available()
     _print_startup_banner(ollama_available)
 
