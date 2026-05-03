@@ -7,6 +7,36 @@ from agent import (
     is_street_only, has_locality_hint,
 )
 
+
+def _render_point_on_map(
+    lat: float,
+    lon: float,
+    display_name: str | None,
+    *,
+    show_lat_lon_text: bool,
+) -> None:
+    map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
+    st.map(map_df, zoom=15)
+    st.success(f"**Address found**: {display_name or 'Unknown'}")
+    if show_lat_lon_text:
+        st.text(f"Latitude: {lat}  |  Longitude: {lon}")
+
+
+def _geocode_and_show_result(query: str) -> None:
+    with st.spinner("Geocoding via Nominatim..."):
+        geocode_result = geocode(query)
+    if not geocode_result:
+        st.error("Address not found in Nominatim.")
+        return
+    lat, lon = float(geocode_result["lat"]), float(geocode_result["lon"])
+    _render_point_on_map(
+        lat,
+        lon,
+        geocode_result.get("display_name"),
+        show_lat_lon_text=True,
+    )
+
+
 # Page configuration
 st.set_page_config(page_title="Address Agent", page_icon="📍", layout="centered")
 st.title("Address & GPS Coordinates Search Agent")
@@ -42,10 +72,12 @@ if submitted and user_input.strip():
             with st.spinner("Reverse geocoding..."):
                 result = reverse_geocode(lat, lon)
             if result:
-                # Map
-                map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
-                st.map(map_df, zoom=15)
-                st.success(f"**Address found**: {result.get('display_name')}")
+                _render_point_on_map(
+                    lat,
+                    lon,
+                    result.get("display_name"),
+                    show_lat_lon_text=False,
+                )
             else:
                 st.error("No address found for these coordinates.")
         st.stop()   # Coordinates processed, stop here
@@ -66,16 +98,7 @@ if submitted and user_input.strip():
 
             if has_street and has_locality:
                 st.caption(f"🌍 Detected language: {llm_result.get('language', 'unknown')}")
-                with st.spinner("Geocoding via Nominatim..."):
-                    geocode_result = geocode(query)
-                if geocode_result:
-                    lat, lon = float(geocode_result["lat"]), float(geocode_result["lon"])
-                    map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
-                    st.map(map_df, zoom=15)
-                    st.success(f"**Address found**: {geocode_result.get('display_name')}")
-                    st.text(f"Latitude: {lat}  |  Longitude: {lon}")
-                else:
-                    st.error("Address not found in Nominatim.")
+                _geocode_and_show_result(query)
             else:
                 # Incomplete address -> custom message
                 missing = []
@@ -98,13 +121,4 @@ if submitted and user_input.strip():
         st.warning("Please include a city or postal code along with the street.")
         st.info("Example: '56 rue des fleurs, Calais' or '56 rue des fleurs 62100'.")
     else:
-        with st.spinner("Geocoding via Nominatim..."):
-            geocode_result = geocode(query)
-        if geocode_result:
-            lat, lon = float(geocode_result["lat"]), float(geocode_result["lon"])
-            map_df = pd.DataFrame({"lat": [lat], "lon": [lon]})
-            st.map(map_df, zoom=15)
-            st.success(f"**Address found**: {geocode_result.get('display_name')}")
-            st.text(f"Latitude: {lat}  |  Longitude: {lon}")
-        else:
-            st.error("Address not found in Nominatim.")
+        _geocode_and_show_result(query)

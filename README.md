@@ -19,7 +19,7 @@ It integrates a local language model (Ollama) to intelligently assess the precis
 1. Clone or download the project
 
 ```bash
-git clone geocoding-agent
+git clone git@github.com:GeraldB69/geocoding-agent.git
 cd geocoding-agent
 ```
 
