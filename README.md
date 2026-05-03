@@ -29,13 +29,15 @@ cd geocoding-agent
 4. [Optional] Install and start Ollama
 
 ```bash
-ollama pull gemma3:1b
+ollama pull llama3.2:1b
 ollama serve   # if needed
 ```
 
 ---
 
 ## Usage
+
+### Command Line
 
 Run the agent with `python agent.py`.
 
@@ -54,6 +56,14 @@ When Ollama is detected, the agent analyzes the input linguistically:
 
 If Ollama is not available, heuristic rules (comma detection, postal code, etc.) take over.
 
+### Graphical web interface
+
+An optional graphical interface built with [Streamlit](https://streamlit.io/) is included.
+
+Run the web interface : `streamlit run app.py`
+
+The interface will open in your browser. It provides the same logic as the terminal agent (LLM analysis when Ollama is available, fallback heuristics otherwise, and reverse geocoding) with a map display for geocoded results.
+
 ---
 
 ## Tests
@@ -70,6 +80,7 @@ They cover detection functions, API calls (mocked), and Ollama integration.
 ```bash
 .
 ├── agent.py              # Main agent script
+├── app.py                # Streamlit web interface (optional)
 ├── test_agent.py         # Unit tests (pytest)
 ├── requirements.txt      # Python dependencies
 └── README.md             # This file
