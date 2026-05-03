@@ -2,17 +2,19 @@ import requests
 import re
 import json
 
-# ollama_model = "granite4:350m"
-ollama_model = "qwen3:0.6b"
+ollama_model = "llama3.2:1b"
 llm_system_prompt = (
     "You are an address parser. Extract the following from the user input, "
     "returning ONLY a strict JSON object with these fields: "
     "{\"language\":\"xx\",\"street\":null,\"city\":null,\"postal_code\":null}. "
-    "language: detect user input language and return ISO 639-1 code. "
-    "street: any recognized thoroughfare (rue, avenue, street, road, etc.) including an optional number, or null. "
-    "city: any recognized populated place name, or null. "
-    "postal_code: any recognized postal/ZIP code, or null. "
-    "No extra text, no markdown."
+    "language: the user language strictly from the user input and return ISO 639-1 code. "
+    "street: any recognized thoroughfare (rue, avenue, street, road, etc.) including an optional number, OR null if not found. "
+    "city: any recognized populated place name, OR null if not found. "
+    "postal_code: any recognized postal/ZIP code, OR null if not found. "
+    "No extra text, no markdown. "
+    "Try case insensitivity for the street name. "
+    "Don't include any other text in the response. "
+    "Don't add any other text in the response."
 )
 
 # ------------------------------------------------------------
@@ -79,7 +81,7 @@ def analyze_with_llm(text):
                 "stream": False,
                 "options": {"temperature": 0}
             },
-            timeout=10
+            timeout=20
         )
         data = response.json()
         content = data["message"]["content"].strip()
@@ -214,9 +216,9 @@ def _process_llm_address_input(user_input):
         print("(LLM call failed, falling back to heuristics)")
         return False
 
-    has_street = llm_result.get("street") is not None
-    has_city = llm_result.get("city") is not None
-    has_postal = llm_result.get("postal_code") is not None
+    has_street = llm_result.get("street") not in [None, "", "null"]
+    has_city = llm_result.get("city") not in [None, "", "null"]
+    has_postal = llm_result.get("postal_code") not in [None, "", "null"]
     has_locality = has_city or has_postal
 
     if not (has_street and has_locality):

@@ -79,7 +79,7 @@ They cover detection functions, API calls (mocked), and Ollama integration.
 
 ## Extending the Project
 
-You can change the Ollama model by modifying the "ollama_model" variable (e.g., "mistral", "phi3").
+For better results, you can change prompt or Ollama model by modifying "llm_system_prompt" or "ollama_model" variables (e.g., "mistral", "phi3").
 
 For deployment on a server without a graphical interface, comment out the interactive loop and expose a REST API using FastAPI, for example.
 
